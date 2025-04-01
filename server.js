@@ -11,8 +11,9 @@ dotenv.config(); // Load environment variables
 
 
 const app = express();
+const cors_uri =  [process.env.CORS_PORT, 'http://localhost:5173']
 app.use(cors({
-  origin: ['https://frontend-ai-tawny.vercel.app', 'http://localhost:5173'], // Allow only your frontend
+  origin: cors_uri, // Allow only your frontend
   methods: 'GET, POST, PUT, DELETE, OPTIONS',
   allowedHeaders: 'Content-Type, Authorization'
 }));
