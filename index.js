@@ -5,7 +5,7 @@ const { evaluate } = require("mathjs");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const imageRoutes = require("./routes/ImageRoute");
-const calculatorRouter = require("./routes/CalculatorRoute"); // Renamed for clarity
+const calculatorRouter = require("./routes/ImageAnalyzer"); // Renamed for clarity
 
 dotenv.config(); // Load environment variables
 
