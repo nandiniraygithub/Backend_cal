@@ -4,8 +4,5 @@
       "source": "/api/(.*)",
       "destination": "/"
     }
-  ],
-  "env": {
-    "SERVER_URL": "http://localhost"
-  }
+  ]
 }
