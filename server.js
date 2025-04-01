@@ -27,6 +27,10 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected Successfully!"))
   .catch((err) => console.error("❌ MongoDB Connection Failed:", err));
 
+  app.get("/getstatus", (req, res) => {
+    res.send("Welcome to the homepage");
+  });
+
 // Use Image Processing Routes
 app.use("/image", imageRoutes);
 
