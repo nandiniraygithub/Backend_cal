@@ -1,0 +1,27 @@
+{
+    "dependencies": {
+        "@google/generative-ai": "^0.24.0",
+        "axios": "^1.8.4",
+        "base64-js": "^1.5.1",
+        "body-parser": "^1.20.3",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "fs": "^0.0.1-security",
+        "mathjs": "^14.4.0",
+        "mongoose": "^8.13.0",
+        "multer": "^1.4.5-lts.2",
+        "node-fetch": "^3.3.2",
+        "sharp": "^0.33.5",
+        "tesseract.js": "^6.0.0",
+        "zod": "^3.24.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "type": "commonjs"
+}
