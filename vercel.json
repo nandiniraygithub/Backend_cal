@@ -1,17 +1,16 @@
 {
-    "headers": [
-      {
-        "source": "/api/(.*)",
-        "headers": [
-          { "key": "Access-Control-Allow-Origin", "value": "*" }
-        ]
-      }
-    ],
-
-    "env": {
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/"
+        }
+      ]
+    }
+  ],
+  "env": {
     "SERVER_URL": "localhost"
   }
 }
-  
-  
-  
