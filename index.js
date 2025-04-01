@@ -12,7 +12,7 @@ dotenv.config(); // Load environment variables
 const app = express();
 
 // ✅ CORS Fix: Use environment variable with fallback
-const cors_uri = [process.env.CORS_ORIGIN || "http://localhost:5173"];
+const cors_uri = [process.env.CORS_ORIGIN || "https://backend-cal.vercel.app"];
 app.use(
   cors({
     origin: cors_uri,
