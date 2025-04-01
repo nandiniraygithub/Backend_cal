@@ -1,40 +1,45 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
-const { evaluate } = require('mathjs');
+const { evaluate } = require("mathjs");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const imageRoutes = require("./routes/ImageRoute");
-const calculatorRouter = require("./routes/ImageAnalyzer");
+const calculatorRouter = require("./routes/CalculatorRoute"); // Renamed for clarity
 
 dotenv.config(); // Load environment variables
 
-
 const app = express();
-const cors_uri =  [process.env.CORS_PORT, 'http://localhost:5173']
-app.use(cors({
-  origin: cors_uri, // Allow only your frontend
-  methods: 'GET, POST, PUT, DELETE, OPTIONS',
-  allowedHeaders: 'Content-Type, Authorization'
-}));
-app.options('*', cors());
-app.use(bodyParser.json({ limit: "50mb" })); // Handle large Base64 images
+
+// ✅ CORS Fix: Use environment variable with fallback
+const cors_uri = [process.env.CORS_ORIGIN || "http://localhost:5173"];
+app.use(
+  cors({
+    origin: cors_uri,
+    methods: "GET, POST, PUT, DELETE, OPTIONS",
+    allowedHeaders: "Content-Type, Authorization",
+  })
+);
+
+app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ Connect to MongoDB
+// ✅ MongoDB Connection with Better Error Handling
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("✅ MongoDB Connected Successfully!"))
-  .catch((err) => console.error("❌ MongoDB Connection Failed:", err));
-
-  app.get("/getstatus", (req, res) => {
-    res.send("Welcome to the homepage");
+  .catch((err) => {
+    console.error("❌ MongoDB Connection Failed:", err);
+    process.exit(1); // Exit the process on failure
   });
 
-// Use Image Processing Routes
-app.use("/image", imageRoutes);
+// ✅ Status Route
+app.get("/getstatus", (req, res) => {
+  res.send("Welcome to the homepage");
+});
 
-//// Calculator Route
+// ✅ Routes
+app.use("/image", imageRoutes);
 app.use("/", calculatorRouter);
 
 const PORT = process.env.PORT || 5000;
