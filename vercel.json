@@ -1,16 +1,11 @@
 {
-  "headers": [
+  "rewrites": [
     {
       "source": "/api/(.*)",
-      "rewrites": [
-        {
-          "source": "/(.*)",
-          "destination": "/"
-        }
-      ]
+      "destination": "/"
     }
   ],
   "env": {
-    "SERVER_URL": "localhost"
+    "SERVER_URL": "http://localhost"
   }
 }
