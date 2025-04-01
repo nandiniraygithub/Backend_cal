@@ -15,7 +15,7 @@ const app = express();
 // const cors_uri = [process.env.CORS_ORIGIN || "https://backend-cal.vercel.app"];
 app.use(
   cors({
-    origin:['http://localhost:5173',"https://backend-cal.vercel.app"] ,
+    origin:['http://localhost:5173',"https://ai-calc-fe.netlify.app"] ,
     methods: "GET, POST, PUT, DELETE, OPTIONS",
     // allowedHeaders: "Content-Type, Authorization",
   })
