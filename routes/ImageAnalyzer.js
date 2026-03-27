@@ -24,7 +24,7 @@ async function analyzeImage(base64Image, dictOfVars) {
     const mimeType = "image/jpeg"; // Default to JPEG, adjust if needed
 
     // Gemini AI Model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     // AI Prompt
     const prompt = `
