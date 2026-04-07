@@ -1,123 +1,280 @@
 const express = require("express");
-const ImageModel = require("../models/ImageModel"); // Import MongoDB model
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const ImageModel = require("../models/ImageModel");
+const axios = require("axios");
+const crypto = require("crypto");
+const sharp = require("sharp");
 require("dotenv").config();
 
 const router = express.Router();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Simple in-memory cache for processed images
+const imageCache = new Map();
+const CACHE_SIZE_LIMIT = 100; // Limit cache size
 
-/**
- * Function to analyze a mathematical image using Google Gemini AI.
- * @param {string} base64Image - Base64-encoded image.
- * @param {Object} dictOfVars - User-defined variables to consider during analysis.
- * @returns {Promise<Array>} - Parsed response from Gemini AI.
- */
-async function analyzeImage(base64Image, dictOfVars) {
+// Ollama Qwen2.5-VL configuration
+const OLLAMA_URL = "http://localhost:11434/api/chat";
+
+// ─── IMAGE OPTIMIZATION ───
+async function optimizeImage(base64Image) {
   try {
-    if (!base64Image) {
-      throw new Error("Base64 image data is required");
-    }
+    console.log("🔧 Starting image optimization...");
+    
+    const buffer = Buffer.from(
+      base64Image.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
+    );
+    
+    console.log("📏 Original buffer size:", buffer.length);
 
-    const dictOfVarsStr = JSON.stringify(dictOfVars || {});
-    const mimeType = "image/jpeg"; // Default to JPEG, adjust if needed
+    const resized = await sharp(buffer)
+      .resize(512, 512, { fit: "inside" }) // Larger for better handwriting recognition
+      .sharpen({ sigma: 1, flat: 1, jagged: 2 }) // Enhance handwriting
+      .jpeg({ quality: 75 })               // Better quality for text
+      .toBuffer();
 
-    // Gemini AI Model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // AI Prompt
-    const prompt = `
-    You have been given an image with some mathematical expressions, equations, or graphical problems, and you need to solve them. Note: Use the PEMDAS rule for solving mathematical expressions. PEMDAS stands for the Priority Order: Parentheses, Exponents, Multiplication and Division (from left to right), Addition and Subtraction (from left to right).
-
-Analyze the equation or expression in this image and return the answer in one of these formats:
-1. Simple math: [{"expr": "given expression", "result": "calculated answer"}]
-2. Equations: [{"expr": "x", "result": 2, "assign": true}, {"expr": "y", "result": 5, "assign": true}]
-3. Variable assignment: [{"expr": "variable", "result": "value", "assign": true}]
-4. Graphical problems: [{"expr": "given expression", "result": "calculated answer"}]
-5. Abstract concepts: [{"expr": "explanation", "result": "concept"}]
-
-Use the following user-defined variables in your calculations: ${dictOfVarsStr}
-
-Important:
-* Extract mathematical expressions and evaluate them. Return a valid JSON array **without enclosing it in markdown or code blocks**.
-* If you cannot solve a problem, provide an explanation in the "result" field.
-* Assume all images are of good quality and contain only mathematical content.
-* Provide detailed results.
-    `;
-
-    // Send AI Request
-    const response = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Image,
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    const result = await response.response;
-    const resultText = await result.text();
-
-    // Parse JSON Response
-    let parsedResponse = [];
-    try {
-      const cleanText = resultText.replace(/```json|```/g, "").trim();
-      console.log('Cleaned text:', cleanText.substring(0, 100) + '...');
-      parsedResponse = JSON.parse(cleanText);
-    } catch (error) {
-      console.error("❌ AI response is not valid JSON:", resultText);
-      parsedResponse = [{ error: "Invalid JSON response from AI", raw_response: resultText }];
-    }
-
-    console.log("✅ AI Analysis:", parsedResponse);
-    return parsedResponse;
+    const result = resized.toString("base64");
+    console.log("✅ Optimization successful, result size:", result.length);
+    return result;
   } catch (error) {
-    console.error("❌ Error analyzing image:", error);
-    return [{ error: "Error processing image", message: error.message }];
+    console.error("❌ Image optimization failed:", error.message);
+    // Return original image if optimization fails
+    return base64Image;
   }
 }
 
-/**
- * Route: POST /calculate
- * Description: Fetches image from MongoDB and analyzes it using Gemini AI.
- */
-router.post("/calculate", async (req, res) => {
+// ─── QWEN2.5-VL SOLVER (OPTIMIZED) ───
+async function solveWithQwen(base64Image, timeoutMs = 30000) {
+  // Check cache first
+  const imageHash = crypto.createHash('md5').update(base64Image).digest('hex');
+  if (imageCache.has(imageHash)) {
+    console.log("🎯 Cache hit!");
+    return imageCache.get(imageHash);
+  }
+
   try {
-    const { imageId, dictOfVars } = req.body;
+    console.log("🤖 Qwen2.5-VL solving (optimized)...");
 
-    if (!imageId) {
-      return res.status(400).json({ error: "imageId is required" });
+    const cleanBase64 = base64Image.includes("base64,")
+      ? base64Image.split("base64,")[1]
+      : base64Image;
+
+    // Ultra-simplified prompt for guaranteed JSON
+    const prompt = `Return ONLY this JSON format for the math problem in the image:
+
+[{"expr": "expression", "result": "answer", "assign": false}]
+
+Examples:
+[{"expr": "2 + 3", "result": "5", "assign": false}]
+[{"expr": "sin(30)", "result": "0.5", "assign": false}]
+[{"expr": "3^2 + 4^2 = 5^2", "result": "25", "assign": false}]
+
+Analyze and return JSON:`;
+
+
+    const response = await axios.post(OLLAMA_URL, {
+      model: "qwen2.5vl:3b",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+          images: [cleanBase64],
+        },
+      ],
+      stream: false,
+      options: {
+        temperature: 0.2, // Slightly higher for better handwriting recognition
+        num_predict: 200, // More tokens for detailed analysis
+        top_k: 20,        // More options for handwriting variability
+        top_p: 0.5,       // Balanced sampling
+        repeat_penalty: 1.1,
+        mirostat: 2,
+        mirostat_tau: 3.0,
+        mirostat_eta: 0.2
+      }
+    }, { timeout: timeoutMs });
+
+    const raw = response.data.message.content;
+    
+    console.log("🔍 Raw Qwen response (full):", raw);
+    console.log("🔍 Response length:", raw.length);
+
+    // Faster JSON extraction - handle list of dictionaries format
+    try {
+      // Try multiple JSON extraction patterns
+      let jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        jsonMatch = raw.match(/\{[\s\S]*\}/);
+      }
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const result = Array.isArray(parsed) ? parsed : [parsed];
+        
+        console.log("✅ Parsed result:", result);
+        
+        // Cache the result
+        if (imageCache.size >= CACHE_SIZE_LIMIT) {
+          const firstKey = imageCache.keys().next().value;
+          imageCache.delete(firstKey);
+        }
+        imageCache.set(imageHash, result);
+        
+        return result;
+      }
+      
+      console.log("❌ No JSON found in response");
+      throw new Error("No JSON found");
+    } catch (parseError) {
+      console.log("🔧 Parse error:", parseError.message);
+      console.log("🔧 Attempting to extract from raw text...");
+      
+      // Try to extract any mathematical content as fallback
+      const mathMatch = raw.match(/(\d+\.?\d*\s*[+\-*/=]\s*\d+\.?\d*)/);
+      if (mathMatch) {
+        const simpleResult = [{
+          expr: mathMatch[1],
+          result: "extracted_from_text",
+          assign: false
+        }];
+        
+        console.log("✅ Extracted math expression:", mathMatch[1]);
+        
+        // Cache the extracted result
+        if (imageCache.size >= CACHE_SIZE_LIMIT) {
+          const firstKey = imageCache.keys().next().value;
+          imageCache.delete(firstKey);
+        }
+        imageCache.set(imageHash, simpleResult);
+        
+        return simpleResult;
+      }
+      
+      // If no math found, return the raw text as result for debugging
+      const fallbackResult = [{
+        expr: "qwen_response",
+        result: raw.slice(0, 200), // Show first 200 chars of raw response
+        assign: false
+      }];
+      
+      console.log("🔧 Returning raw Qwen response for debugging");
+      
+      // Cache fallback result too
+      if (imageCache.size >= CACHE_SIZE_LIMIT) {
+        const firstKey = imageCache.keys().next().value;
+        imageCache.delete(firstKey);
+      }
+      imageCache.set(imageHash, fallbackResult);
+      
+      return fallbackResult;
     }
-
-    // Fetch image from MongoDB
-    const imageDoc = await ImageModel.findById(imageId);
-    if (!imageDoc) {
-      return res.status(404).json({ error: "Image not found" });
-    }
-
-    const base64Image = imageDoc.image;
-    const variables = dictOfVars || imageDoc.dict_of_vars;
-
-    console.log("📤 Retrieved image from MongoDB:", imageId);
-
-    // Process image with AI
-    const result = await analyzeImage(base64Image, variables);
-
-    res.json({ result });
 
   } catch (error) {
-    console.error("❌ Error in /calculate:", error);
-    res.status(500).json({ error: "Failed to analyze image", message: error.message });
+    console.error("❌ Qwen Error:", error.message);
+    
+    // Quick fallback for timeout/common errors
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      const timeoutResult = [{
+        expr: "timeout",
+        result: "Processing took too long",
+        assign: false
+      }];
+      
+      // Cache timeout result
+      if (imageCache.size >= CACHE_SIZE_LIMIT) {
+        const firstKey = imageCache.keys().next().value;
+        imageCache.delete(firstKey);
+      }
+      imageCache.set(imageHash, timeoutResult);
+      
+      return timeoutResult;
+    }
+    
+    // Ultra-fast fallback
+    const fallbackResult = [{
+      expr: "fallback",
+      result: "AI model busy",
+      assign: false
+    }];
+    
+    // Cache fallback result
+    if (imageCache.size >= CACHE_SIZE_LIMIT) {
+      const firstKey = imageCache.keys().next().value;
+      imageCache.delete(firstKey);
+    }
+    imageCache.set(imageHash, fallbackResult);
+    
+    return fallbackResult;
+  }
+}
+
+// ─── Route: POST /calculate ──────────────────────────────────────────────────
+
+router.post("/calculate", async (req, res) => {
+  try {
+    const { image, imageId } = req.body;
+
+    let base64Image;
+
+    // Check for direct image FIRST
+    if (image) {
+      // Direct image processing
+      console.log("📥 Processing direct image");
+      base64Image = image;
+    } else if (imageId) {
+      // Fetch image from MongoDB
+      console.log("📥 Fetching image from MongoDB with ID:", imageId);
+      const imageDoc = await ImageModel.findById(imageId);
+      if (!imageDoc) {
+        return res.status(404).json({ error: "Image not found" });
+      }
+      base64Image = imageDoc.image;
+    } else {
+      return res.status(400).json({ error: "Either image or imageId is required" });
+    }
+
+    console.log("📥 Original image size:", base64Image.length);
+
+    console.log("🖼️ Optimizing image...");
+    const optimizedImage = await optimizeImage(base64Image);
+    console.log("✅ Optimized image size:", optimizedImage.length);
+    
+    // Validate optimized image
+    if (!optimizedImage || optimizedImage.length < 100) {
+      return res.json([{
+        expr: "image_error",
+        result: "Image optimization failed - image too small",
+        assign: false
+      }]);
+    }
+
+    console.log("📤 Sending to Qwen2.5-VL (optimized)...");
+    const result = await solveWithQwen(optimizedImage, 15000); // 15 seconds
+
+    return res.json(result);
+
+  } catch (error) {
+    console.error("❌ Error:", error);
+    return res.status(500).json([{
+      expr: "server_error",
+      result: error.message,
+      assign: false
+    }]);
   }
 });
 
-module.exports = router;
+// Cache status endpoint
+router.get("/cache-status", (req, res) => {
+  res.json({
+    cacheSize: imageCache.size,
+    limit: CACHE_SIZE_LIMIT,
+    usage: `${Math.round((imageCache.size / CACHE_SIZE_LIMIT) * 100)}%`
+  });
+});
+
+// Clear cache endpoint
+router.post("/clear-cache", (req, res) => {
+  imageCache.clear();
+  res.json({ message: "Cache cleared" });
+});
+
+module.exports = { router, solveWithQwen };

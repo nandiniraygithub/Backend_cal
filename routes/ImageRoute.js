@@ -37,8 +37,9 @@ router.post("/", upload.single("image"), async (req, res) => {
       return res.status(400).json({ message: "Invalid image data", status: "error" });
     }
 
-    // Convert image to Base64
-    const base64Image = imageBuffer.toString("base64");
+    // Convert image to Base64 with proper data URL format
+    const base64Image = `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
+    console.log("📤 Converted to base64, length:", base64Image.length);
 
     // Store image in MongoDB (Corrected usage)
     const savedImage = await ImageModel.create({

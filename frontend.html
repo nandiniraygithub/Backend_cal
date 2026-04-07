@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Math Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .canvas-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        #drawingCanvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+            transform: translateY(-2px);
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-input-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #17a2b8;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-input-button:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
+        
+        .ai-output {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            padding: 30px;
+            color: white;
+            text-align: center;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .ai-output h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .result-display {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            backdrop-filter: blur(10px);
+        }
+        
+        .expression {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .result {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #dc3545;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background: #28a745;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .input-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Math Calculator</h1>
+        
+        <div class="input-section">
+            <div class="canvas-container">
+                <h3>✏️ Draw Math Problem</h3>
+                <canvas id="drawingCanvas" width="300" height="300"></canvas>
+                <div class="controls">
+                    <button class="btn-secondary" onclick="clearCanvas()">Clear</button>
+                    <button class="btn-primary" onclick="solveFromCanvas()">Solve</button>
+                </div>
+            </div>
+            
+            <div class="upload-section">
+                <h3>📷 Or Upload Image</h3>
+                <div class="file-input-wrapper">
+                    <input type="file" id="imageInput" class="file-input" accept="image/*" onchange="handleFileSelect(event)">
+                    <div class="file-input-button">Choose Image</div>
+                </div>
+                <div id="fileName"></div>
+                <button class="btn-success" onclick="solveFromUpload()" style="display:none;" id="uploadButton">Solve Uploaded Image</button>
+            </div>
+        </div>
+        
+        <div class="ai-output">
+            <h2>🧠 AI Output</h2>
+            <div id="resultContainer">
+                <div class="result-display">
+                    <div class="expression">Draw or upload a math problem to see the solution here!</div>
+                    <div class="result">🤖 Ready to help!</div>
+                </div>
+            </div>
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>AI is solving your math problem...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let canvas = document.getElementById('drawingCanvas');
+        let ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let currentImageId = null;
+
+        // Canvas setup
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+
+        // Drawing functions
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch events for mobile
+        canvas.addEventListener('touchstart', handleTouch);
+        canvas.addEventListener('touchmove', handleTouch);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                             e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                document.getElementById('fileName').innerHTML = `<p>Selected: ${file.name}</p>`;
+                document.getElementById('uploadButton').style.display = 'inline-block';
+            }
+        }
+
+        async function solveFromCanvas() {
+            // Check if canvas has content
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const hasContent = imageData.data.some((channel, index) => index % 4 === 3 && channel > 0);
+            
+            if (!hasContent) {
+                showError('Please draw something on the canvas first!');
+                return;
+            }
+            
+            showLoading();
+            try {
+                // Convert canvas to base64 and send directly to calculate
+                const base64Image = canvas.toDataURL('image/png');
+                console.log('Sending image directly to calculate...');
+                console.log('Image length:', base64Image.length);
+                console.log('Image preview:', base64Image.substring(0, 100) + '...');
+                
+                const response = await fetch('http://localhost:5000/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: base64Image })
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                const result = await response.json();
+                console.log('Calculate response:', result);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response text:', errorText);
+                    throw new Error(result[0]?.result || `Calculation failed: ${response.status}`);
+                }
+
+                // Display the result
+                displayResult(result);
+
+            } catch (error) {
+                console.error('Full error:', error);
+                showError('Error: ' + error.message);
+            }
+        }
+
+        async function solveFromUpload() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showError('Please select an image first');
+                return;
+            }
+
+            showLoading();
+            await uploadAndSolve(file);
+        }
+
+        async function uploadAndSolve(imageFile) {
+            try {
+                // Step 1: Upload image
+                const formData = new FormData();
+                formData.append('image', imageFile);
+
+                console.log('Uploading image...');
+                const uploadResponse = await fetch('http://localhost:5000/image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Upload response status:', uploadResponse.status);
+                console.log('Upload response headers:', uploadResponse.headers);
+
+                const uploadResult = await uploadResponse.json();
+                console.log('Upload response:', uploadResult);
+                
+                if (!uploadResponse.ok) {
+                    throw new Error(uploadResult.message || `Upload failed with status ${uploadResponse.status}`);
+                }
+
+                if (!uploadResult.imageId) {
+                    console.error('Upload result missing imageId:', uploadResult);
+                    throw new Error('No imageId received from upload');
+                }
+
+                currentImageId = uploadResult.imageId;
+                console.log('Image uploaded successfully, imageId:', currentImageId);
+
+                // Step 2: Calculate
+                console.log('Starting calculation...');
+                const calculateResponse = await fetch('http://localhost:5000/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ imageId: currentImageId })
+                });
+
+                const calculateResult = await calculateResponse.json();
+                console.log('Calculate response:', calculateResult);
+                
+                if (!calculateResponse.ok) {
+                    const errorText = await calculateResponse.text();
+                    console.error('Calculate error response:', errorText);
+                    throw new Error(calculateResult[0]?.result || `Calculation failed: ${errorText}`);
+                }
+
+                // Display the result
+                displayResult(calculateResult);
+
+            } catch (error) {
+                console.error('Full error:', error);
+                showError('Error: ' + error.message);
+            }
+        }
+
+        function displayResult(result) {
+            hideLoading();
+            
+            if (result && result.length > 0) {
+                const data = result[0];
+                
+                // Clear the canvas and write the result on it
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Set text properties
+                ctx.font = 'bold 32px Arial';
+                ctx.fillStyle = '#007bff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Write the result on canvas
+                const resultText = `${data.expr} = ${data.result}`;
+                ctx.fillText(resultText, canvas.width / 2, canvas.height / 2);
+                
+                // Also show in the AI output section
+                const container = document.getElementById('resultContainer');
+                container.innerHTML = `
+                    <div class="result-display success">
+                        <div class="expression">✅ Solved!</div>
+                        <div class="result">Check the canvas for result</div>
+                    </div>
+                `;
+            } else {
+                showError('No result received');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultContainer').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('resultContainer').style.display = 'block';
+        }
+
+        function showError(message) {
+            hideLoading();
+            const container = document.getElementById('resultContainer');
+            container.innerHTML = `
+                <div class="result-display error">
+                    <div class="expression">❌ Error</div>
+                    <div class="result">${message}</div>
+                    <small>Check browser console (F12) for details</small>
+                </div>
+            `;
+            console.error('Frontend Error:', message);
+        }
+    </script>
+</body>
+</html>
